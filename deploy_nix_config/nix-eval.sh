@@ -32,6 +32,8 @@ command+=("$@")
 echo "running (instantiating): ${NIX_PATH:+NIX_PATH=$NIX_PATH} ${command[*]@Q}" -A out_path >&2
 first_output=$("${command[@]}")
 
+# need to build first to check the requirements in store
+nix build --show-trace "${flake_dir}#${flake_attr}"
 # Get references for diff
 out_path=$(nix eval --json --impure --show-trace "${flake_dir}#${flake_attr}" | tr -d '"')
 second_output=$(nix-store -qR "${out_path}" \

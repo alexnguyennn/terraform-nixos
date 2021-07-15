@@ -19,23 +19,31 @@ sshOpts=(
   -o "GlobalKnownHostsFile=/dev/null"
   # interactive authentication is not possible
   -o "BatchMode=yes"
-  # verbose output for easier debugging
-  -v
+  # verbose output for easier debugging set based on flag later
 )
 
 ###  Argument parsing ###
 
 drvPath="${1}"
 outPath="${2}"
-targetHost="${3}"
-targetPort="${4}"
-buildOnTarget="${5}"
+localDeploy="${3}"
+targetHost="${4}"
+targetPort="${5}"
 sshPrivateKey="${6}"
-activateAction="${7}"
-activateScriptPath="${8}"
-nixProfile="${9}"
-deleteOlderThan="${10}"
-shift 10
+verboseOutput="${7}"
+activateAction="${8}"
+activateScriptPath="${9}"
+buildOnTarget="${10}"
+nixProfile="${11}"
+escalateDeploy="${12}"
+deleteOlderThan="${13}"
+shift 13
+
+
+# Set ssh verbosity if toggled
+if [[ "${verboseOutput:-false}" == "true" ]]; then
+  sshOpts+=(-v)
+fi
 
 profile="/nix/var/nix/profiles/${nixProfile}"
 
@@ -75,7 +83,23 @@ targetHostCmd() {
   # shellcheck disable=SC2029
 #   ssh "${sshOpts[@]}" "$targetHost" "./maybe-sudo.sh ${*@Q}"
  # TODO: fixup
-  ssh "${sshOpts[@]}" "$targetHost" "${*@Q}"
+ # TODO: provide option for no ssh
+ # TODO: provide option for no sudo
+  if [[ "${escalateDeploy:-false}" == "true" ]]; then
+    commandToRun="./maybe-sudo.sh ${*@Q}"
+  else
+    commandToRun="${*@Q}"
+  fi
+
+  if [[ "${verboseOutput:-false}" == "true" ]]; then
+    log "executing command (local deploy is ${localDeploy}): ${commandToRun}"
+  fi
+
+  if [[ "${localDeploy:-false}" == "true" ]]; then
+    sh -c "${commandToRun}"
+  else
+    ssh "${sshOpts[@]}" "$targetHost" "${commandToRun}"
+  fi
 }
 
 # Setup a temporary ControlPath for this session. This speeds-up the
@@ -100,7 +124,9 @@ setupControlPath() {
 
 ### Main ###
 
-setupControlPath
+if [[ "${localDeploy:-false}" != "true" ]]; then
+  setupControlPath
+fi
 
 if [[ "${buildOnTarget:-false}" == true ]]; then
 
@@ -120,9 +146,10 @@ else
   outPath=$(nix-store --realize "$drvPath" "${buildArgs[@]}")
 
   # Upload build results
-  log "uploading build results"
-  copyToTarget "$outPath" --gzip --use-substitutes
-
+  if [[ "${localDeploy:-false}" != "true" ]]; then
+    log "uploading build results"
+    copyToTarget "$outPath" --gzip --use-substitutes
+  fi
 fi
 
 # Activate

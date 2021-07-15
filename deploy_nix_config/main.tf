@@ -107,6 +107,24 @@ variable "nix_profile" {
   default = "system"
 }
 
+variable "verbose_output" {
+  type = bool
+  description = "enable verbose output for debugging"
+  default = false
+}
+
+variable "escalate_deploy" {
+  type = bool
+  description = "use maybe_sudo to escalate before running activation script (useful for NixOS but not necessary for Home Manager)"
+  default = false
+}
+
+variable "local_deploy" {
+  type = bool
+  description = "run in local mode: bypasses ssh for remote deployment and just runs a nix-flake-deploy locally"
+  default = false
+}
+
 # --------------------------------------------------------------------------
 
 locals {
@@ -143,6 +161,8 @@ data "external" "nixos-instantiate" {
 }
 
 resource "null_resource" "deploy_nixos" {
+  // TODO: make count work - abstract output to take whichever one is instantiated
+  count = var.local_deploy ? 0 : 1
   triggers = merge(var.triggers, local.triggers)
 
   connection {
@@ -186,16 +206,47 @@ resource "null_resource" "deploy_nixos" {
       "${path.module}/nix-flake-deploy.sh",
       data.external.nixos-instantiate.result["drv_path"],
       data.external.nixos-instantiate.result["out_path"],
+      var.local_deploy,
       "${var.target_user}@${var.target_host}",
       var.target_port,
-      local.build_on_target,
       local.ssh_private_key == "" ? "-" : local.ssh_private_key,
+      var.verbose_output,
       var.activate_action == "" ? "-" : var.activate_action,
       var.activate_script_path,
+      local.build_on_target,
       var.nix_profile,
+      var.escalate_deploy,
       var.delete_older_than,
       ],
       local.extra_build_args
+    )
+    command = "ignoreme"
+  }
+}
+
+resource "null_resource" "deploy_nixos_local" {
+  count = var.local_deploy ? 1 : 0
+  triggers = merge(var.triggers, local.triggers)
+
+  # do the actual deployment
+  provisioner "local-exec" {
+    interpreter = concat([
+      "${path.module}/nix-flake-deploy.sh",
+      data.external.nixos-instantiate.result["drv_path"],
+      data.external.nixos-instantiate.result["out_path"],
+      var.local_deploy,
+      "${var.target_user}@${var.target_host}",
+      var.target_port,
+      local.ssh_private_key == "" ? "-" : local.ssh_private_key,
+      var.verbose_output,
+      var.activate_action == "" ? "-" : var.activate_action,
+      var.activate_script_path,
+      local.build_on_target,
+      var.nix_profile,
+      var.escalate_deploy,
+      var.delete_older_than,
+    ],
+    local.extra_build_args
     )
     command = "ignoreme"
   }
@@ -205,6 +256,7 @@ resource "null_resource" "deploy_nixos" {
 
 output "id" {
   description = "random ID that changes on every nixos deployment"
-  value       = null_resource.deploy_nixos.id
+//  value       = null_resource.deploy_nixos.id
+    value       = var.local_deploy ? null_resource.deploy_nixos_local[0].id : null_resource.deploy_nixos[0].id
 }
 
