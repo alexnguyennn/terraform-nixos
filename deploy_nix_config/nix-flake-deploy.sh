@@ -137,7 +137,10 @@ if [[ "${buildOnTarget:-false}" == "true" ]]; then
 
   # Build remotely
   log "building on target"
-  set -x
+  if [[ "${verboseOutput:-false}" == "true" ]]; then
+    set -x
+  fi
+
   targetHostCmd "nix-store" "--realize" "$drvPath" "${buildArgs[@]}"
 
 else
