@@ -31,7 +31,7 @@ targetHost="${4}"
 targetPort="${5}"
 sshPrivateKey="${6}"
 verboseOutput="${7}"
-activateAction="${8}"
+activateActions="${8}"
 activateScriptPath="${9}"
 buildOnTarget="${10}"
 nixProfile="${11}"
@@ -86,7 +86,8 @@ targetHostCmd() {
  # TODO: provide option for no ssh
  # TODO: provide option for no sudo
   if [[ "${escalateDeploy:-false}" == "true" ]]; then
-    commandToRun="./maybe-sudo.sh ${*@Q}"
+    local script_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    commandToRun="${script_path}/./maybe-sudo.sh ${*@Q}"
   else
     commandToRun="${*@Q}"
   fi
@@ -128,7 +129,7 @@ if [[ "${localDeploy:-false}" != "true" ]]; then
   setupControlPath
 fi
 
-if [[ "${buildOnTarget:-false}" == true ]]; then
+if [[ "${buildOnTarget:-false}" == "true" ]]; then
 
   # Upload derivation
   log "uploading derivations"
@@ -155,15 +156,17 @@ fi
 # Activate
 log "activating configuration"
 targetHostCmd nix-env --profile "$profile" --set "$outPath"
-if [[ "${activateAction:--}" == "-" ]]; then
+if [[ "${activateActions:--}" == "-" ]]; then
   targetHostCmd "${outPath}/${activateScriptPath}"
 else
-  targetHostCmd "${outPath}/${activateScriptPath}" "$activateAction"
+  # read actions as space separated array
+  IFS=' ' read -ra activateActionArray <<< "${activateActions}"
+  targetHostCmd "${outPath}/${activateScriptPath}" "${activateActionArray[@]}"
 fi
 
 # Cleanup previous generations
 log "collecting old nix derivations"
-# Deliberately not quoting $deleteOlderThan so the user can configure something like "1 2 3" 
+# Deliberately not quoting $deleteOlderThan so the user can configure something like "1 2 3"
 # to keep generations with those numbers
 # targetHostCmd "nix-env" "--profile" "$profile" "--delete-generations" $deleteOlderThan
 targetHostCmd "nix-env" "--profile" "$profile" "--delete-generations" $deleteOlderThan

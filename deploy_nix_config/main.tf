@@ -95,9 +95,9 @@ variable "activate_script_path" {
   default = "bin/switch-to-configuration"
 }
 
-variable "activate_action" {
-  type = string
-  description = "action argument to give to activation script. Defaults to value for NixOS switch-to-configuration"
+variable "activate_actions" {
+  type = string # taken as string but will be interpreted as individual arguments in script
+  description = "space separated action arguments to give to activation script. Defaults to value for NixOS switch-to-configuration"
   default = "switch"
 }
 
@@ -211,7 +211,7 @@ resource "null_resource" "deploy_nixos" {
       var.target_port,
       local.ssh_private_key == "" ? "-" : local.ssh_private_key,
       var.verbose_output,
-      var.activate_action == "" ? "-" : var.activate_action,
+      var.activate_actions == "" ? "-" : var.activate_actions,
       var.activate_script_path,
       local.build_on_target,
       var.nix_profile,
@@ -239,7 +239,7 @@ resource "null_resource" "deploy_nixos_local" {
       var.target_port,
       local.ssh_private_key == "" ? "-" : local.ssh_private_key,
       var.verbose_output,
-      var.activate_action == "" ? "-" : var.activate_action,
+      var.activate_actions == "" ? "-" : var.activate_actions,
       var.activate_script_path,
       local.build_on_target,
       var.nix_profile,
