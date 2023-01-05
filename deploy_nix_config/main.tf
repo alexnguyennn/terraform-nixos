@@ -114,9 +114,13 @@ variable "verbose_output" {
 }
 
 variable "escalate_deploy" {
-  type = bool
+  type = map(bool)
   description = "use maybe_sudo to escalate before running activation script (useful for NixOS but not necessary for Home Manager)"
-  default = false
+  default = {
+    profile = false # used in nix profile setting
+    commands = false
+    garbage_collection = false
+  }
 }
 
 variable "local_deploy" {
@@ -215,7 +219,9 @@ resource "null_resource" "deploy_nixos" {
       var.activate_script_path,
       local.build_on_target,
       var.nix_profile,
-      var.escalate_deploy,
+      var.escalate_deploy.profile,
+      var.escalate_deploy.commands,
+      var.escalate_deploy.garbage_collection,
       var.delete_older_than,
       ],
       local.extra_build_args
@@ -243,7 +249,9 @@ resource "null_resource" "deploy_nixos_local" {
       var.activate_script_path,
       local.build_on_target,
       var.nix_profile,
-      var.escalate_deploy,
+      var.escalate_deploy.profile,
+      var.escalate_deploy.commands,
+      var.escalate_deploy.garbage_collection,
       var.delete_older_than,
     ],
     local.extra_build_args

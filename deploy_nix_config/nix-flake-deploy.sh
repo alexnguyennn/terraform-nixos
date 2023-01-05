@@ -35,9 +35,11 @@ activateActions="${8}"
 activateScriptPath="${9}"
 buildOnTarget="${10}"
 nixProfile="${11}"
-escalateDeploy="${12}"
-deleteOlderThan="${13}"
-shift 13
+escalateDeployForProfile="${12}"
+escalateDeployForCommands="${13}"
+escalateDeployForGC="${14}"
+deleteOlderThan="${15}"
+shift 15
 
 
 # Set ssh verbosity if toggled
@@ -75,6 +77,9 @@ copyToTarget() {
 
 # assumes that passwordless sudo is enabled on the server
 targetHostCmd() {
+  shouldEscalate="${1}"
+  shift 1
+
   # ${*@Q} escapes the arguments losslessly into space-separted quoted strings.
   # `ssh` did not properly maintain the array nature of the command line,
   # erroneously splitting arguments with internal spaces, even when using `--`.
@@ -85,7 +90,7 @@ targetHostCmd() {
  # TODO: fixup
  # TODO: provide option for no ssh
  # TODO: provide option for no sudo
-  if [[ "${escalateDeploy:-false}" == "true" ]]; then
+  if [[ "${shouldEscalate:-false}" == "true" ]]; then
     local script_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     commandToRun="${script_path}/./maybe-sudo.sh ${*@Q}"
   else
@@ -141,7 +146,8 @@ if [[ "${buildOnTarget:-false}" == "true" ]]; then
     set -x
   fi
 
-  targetHostCmd "nix-store" "--realize" "$drvPath" "${buildArgs[@]}"
+  # assume never need  to elevate to realise
+  targetHostCmd "false" "nix-store" "--realize" "$drvPath" "${buildArgs[@]}"
 
 else
 
@@ -158,13 +164,13 @@ fi
 
 # Activate
 log "activating configuration"
-targetHostCmd nix-env --profile "$profile" --set "$outPath"
+targetHostCmd "${escalateDeployForProfile}" nix-env --profile "$profile" --set "$outPath"
 if [[ "${activateActions:--}" == "-" ]]; then
-  targetHostCmd "${outPath}/${activateScriptPath}"
+  targetHostCmd "${escalateDeployForCommands}" "${outPath}/${activateScriptPath}"
 else
   # read actions as space separated array
   IFS=' ' read -ra activateActionArray <<< "${activateActions}"
-  targetHostCmd "${outPath}/${activateScriptPath}" "${activateActionArray[@]}"
+  targetHostCmd "${escalateDeployForCommands}" "${outPath}/${activateScriptPath}" "${activateActionArray[@]}"
 fi
 
 # Cleanup previous generations
@@ -172,5 +178,5 @@ log "collecting old nix derivations"
 # Deliberately not quoting $deleteOlderThan so the user can configure something like "1 2 3"
 # to keep generations with those numbers
 # targetHostCmd "nix-env" "--profile" "$profile" "--delete-generations" $deleteOlderThan
-targetHostCmd "nix-env" "--profile" "$profile" "--delete-generations" $deleteOlderThan
-targetHostCmd "nix-store" "--gc"
+targetHostCmd "${escalateDeployForGC}" "nix-env" "--profile" "$profile" "--delete-generations" $deleteOlderThan
+targetHostCmd "${escalateDeployForCommands}" "nix-store" "--gc"
