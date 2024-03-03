@@ -123,6 +123,12 @@ variable "escalate_deploy" {
   }
 }
 
+variable "garbage_collection" {
+  type = bool
+  # turns on garbage collection at the end
+  default = true
+}
+
 variable "local_deploy" {
   type = bool
   description = "run in local mode: bypasses ssh for remote deployment and just runs a nix-flake-deploy locally"
@@ -223,6 +229,7 @@ resource "null_resource" "deploy_nixos" {
       var.escalate_deploy.commands,
       var.escalate_deploy.garbage_collection,
       var.delete_older_than,
+      var.garbage_collection,
       ],
       local.extra_build_args
     )
@@ -253,6 +260,7 @@ resource "null_resource" "deploy_nixos_local" {
       var.escalate_deploy.commands,
       var.escalate_deploy.garbage_collection,
       var.delete_older_than,
+      var.garbage_collection,
     ],
     local.extra_build_args
     )

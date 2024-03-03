@@ -39,7 +39,8 @@ escalateDeployForProfile="${12}"
 escalateDeployForCommands="${13}"
 escalateDeployForGC="${14}"
 deleteOlderThan="${15}"
-shift 15
+shouldGarbageCollect="${16}"
+shift 16
 
 
 # Set ssh verbosity if toggled
@@ -179,4 +180,6 @@ log "collecting old nix derivations"
 # to keep generations with those numbers
 # targetHostCmd "nix-env" "--profile" "$profile" "--delete-generations" $deleteOlderThan
 targetHostCmd "${escalateDeployForGC}" "nix-env" "--profile" "$profile" "--delete-generations" $deleteOlderThan
-targetHostCmd "${escalateDeployForCommands}" "nix-store" "--gc"
+if [ "${shouldGarbageCollect:-true}" = "true" ]; then
+  targetHostCmd "${escalateDeployForCommands}" "nix-store" "--gc"
+fi
