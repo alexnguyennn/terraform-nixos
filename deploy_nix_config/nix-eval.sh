@@ -3,8 +3,7 @@ set -euo pipefail
 # Args
 flake_dir=$1
 flake_attr=$2
-cache_flake_attr=$3
-shift 3
+shift 2
 
 # attr of derivation
 # flake_dir="."
@@ -19,8 +18,6 @@ command=(nix eval --json --impure --show-trace --expr "
   in
   {
     inherit (builtins) currentSystem;
-    substituters = concatWithSpaceSeparator flake.${cache_flake_attr}.binaryCaches;
-    trusted-public-keys = concatWithSpaceSeparator flake.${cache_flake_attr}.binaryCachePublicKeys;
     drv_path = flake.${flake_attr}.drvPath;
     out_path = flake.${flake_attr};
   }")

@@ -76,49 +76,45 @@ variable "delete_older_than" {
 }
 
 variable "flake_dir" {
-  type = string
+  type        = string
   description = "path to directory containing the nix flake to diff and deploy"
 }
 
 variable "flake_attr" {
-  type = string
+  type        = string
   description = "flake path (after # in nix build .#path.To.Flake) to evaluate and deploy"
-}
-variable "cache_flake_attr" {
-  type = string
-  description = "flake path (after # in nix build .#path.To.Flake) to get binary cache details from (nixosSystem flakes will have this; variables live in nixpkgs)"
 }
 
 variable "activate_script_path" {
-  type = string
+  type        = string
   description = "path relative to store output path of activation script. Defaults to NixOS value"
-  default = "bin/switch-to-configuration"
+  default     = "bin/switch-to-configuration"
 }
 
 variable "activate_actions" {
-  type = string # taken as string but will be interpreted as individual arguments in script
+  type        = string # taken as string but will be interpreted as individual arguments in script
   description = "space separated action arguments to give to activation script. Defaults to value for NixOS switch-to-configuration"
-  default = "switch"
+  default     = "switch"
 }
 
 variable "nix_profile" {
-  type = string
+  type        = string
   description = "path relative to /nix/var/nix/profiles/ (default profile location) for profile to use. Defaults to value for NixOS, modify for home-manager for example."
-  default = "system"
+  default     = "system"
 }
 
 variable "verbose_output" {
-  type = bool
+  type        = bool
   description = "enable verbose output for debugging"
-  default = false
+  default     = false
 }
 
 variable "escalate_deploy" {
-  type = map(bool)
+  type        = map(bool)
   description = "use maybe_sudo to escalate before running activation script (useful for NixOS but not necessary for Home Manager)"
   default = {
-    profile = false # used in nix profile setting
-    commands = false
+    profile            = false # used in nix profile setting
+    commands           = false
     garbage_collection = false
   }
 }
@@ -130,31 +126,26 @@ variable "garbage_collection" {
 }
 
 variable "local_deploy" {
-  type = bool
+  type        = bool
   description = "run in local mode: bypasses ssh for remote deployment and just runs a nix-flake-deploy locally"
-  default = false
+  default     = false
 }
 
 # --------------------------------------------------------------------------
 
 locals {
   triggers = {
-    deploy_nixos_drv  = data.external.nixos-instantiate.result["drv_path"]
-    deploy_nixos_keys = sha256(jsonencode(var.keys))
-    deploy_nix_references =data.external.nixos-instantiate.result["references"]
+    deploy_nixos_drv      = data.external.nixos-instantiate.result["drv_path"]
+    deploy_nixos_keys     = sha256(jsonencode(var.keys))
+    deploy_nix_references = data.external.nixos-instantiate.result["references"]
   }
 
-  extra_build_args = concat([
-    "--option", "substituters", data.external.nixos-instantiate.result["substituters"],
-    "--option", "trusted-public-keys", data.external.nixos-instantiate.result["trusted-public-keys"],
-    ],
-    var.extra_build_args,
-  )
+  extra_build_args     = var.extra_build_args
   ssh_private_key_file = var.ssh_private_key_file == "" ? "-" : var.ssh_private_key_file
   ssh_private_key      = local.ssh_private_key_file == "-" ? var.ssh_private_key : file(local.ssh_private_key_file)
   ssh_agent            = var.ssh_agent == null ? (local.ssh_private_key != "") : var.ssh_agent
   build_on_target      = data.external.nixos-instantiate.result["currentSystem"] != var.target_system ? true : tobool(var.build_on_target)
-  out_path = data.external.nixos-instantiate.result["out_path"]
+  out_path             = data.external.nixos-instantiate.result["out_path"]
 }
 
 # used to detect changes in the configuration
@@ -162,8 +153,7 @@ data "external" "nixos-instantiate" {
   program = concat([
     "${path.module}/nix-eval.sh",
     var.flake_dir,
-    var.flake_attr,
-    var.cache_flake_attr
+    var.flake_attr
     # end of positional arguments
     ],
     var.extra_eval_args,
@@ -172,7 +162,7 @@ data "external" "nixos-instantiate" {
 
 resource "null_resource" "deploy_nixos" {
   // TODO: make count work - abstract output to take whichever one is instantiated
-  count = var.local_deploy ? 0 : 1
+  count    = var.local_deploy ? 0 : 1
   triggers = merge(var.triggers, local.triggers)
 
   connection {
@@ -238,7 +228,7 @@ resource "null_resource" "deploy_nixos" {
 }
 
 resource "null_resource" "deploy_nixos_local" {
-  count = var.local_deploy ? 1 : 0
+  count    = var.local_deploy ? 1 : 0
   triggers = merge(var.triggers, local.triggers)
 
   # do the actual deployment
@@ -261,8 +251,8 @@ resource "null_resource" "deploy_nixos_local" {
       var.escalate_deploy.garbage_collection,
       var.delete_older_than,
       var.garbage_collection,
-    ],
-    local.extra_build_args
+      ],
+      local.extra_build_args
     )
     command = "ignoreme"
   }
@@ -272,7 +262,6 @@ resource "null_resource" "deploy_nixos_local" {
 
 output "id" {
   description = "random ID that changes on every nixos deployment"
-//  value       = null_resource.deploy_nixos.id
-    value       = var.local_deploy ? null_resource.deploy_nixos_local[0].id : null_resource.deploy_nixos[0].id
+  //  value       = null_resource.deploy_nixos.id
+  value = var.local_deploy ? null_resource.deploy_nixos_local[0].id : null_resource.deploy_nixos[0].id
 }
-
